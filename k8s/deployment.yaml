@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eks-pod-doctor
+  namespace: mcp-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eks-pod-doctor
+  template:
+    metadata:
+      labels:
+        app: eks-pod-doctor
+    spec:
+      serviceAccountName: eks-pod-doctor
+      containers:
+        - name: server
+          image: <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/eks-pod-doctor:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
