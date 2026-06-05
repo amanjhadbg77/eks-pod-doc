@@ -1,10 +1,40 @@
+import logging
+import os
+import sys
 from typing import Any, Dict, List, Optional
 
 from kubernetes import client, config
 from kubernetes.client import ApiException
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.responses import JSONResponse
 
-mcp = FastMCP("eks-pod-doctor")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stderr,
+)
+logger = logging.getLogger("eks-pod-doctor")
+
+MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio").lower()
+MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
+MCP_PORT = int(os.getenv("MCP_PORT", "8080"))
+HTTP_MODE = MCP_TRANSPORT in {"http", "streamable-http"}
+
+mcp_kwargs: dict[str, Any] = {"name": "eks-pod-doctor"}
+if HTTP_MODE:
+    mcp_kwargs.update(
+        {
+            "host": MCP_HOST,
+            "port": MCP_PORT,
+            "stateless_http": True,
+            "transport_security": TransportSecuritySettings(
+                enable_dns_rebinding_protection=False,
+            ),
+        }
+    )
+
+mcp = FastMCP(**mcp_kwargs)
 _KUBE_LOADED = False
 
 
@@ -105,6 +135,11 @@ def _collect_pod_findings(pod: client.V1Pod, events: List[client.CoreV1Event]) -
 def _core_api() -> client.CoreV1Api:
     _load_kube_config()
     return client.CoreV1Api()
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(_request) -> JSONResponse:
+    return JSONResponse({"status": "healthy", "service": "eks-pod-doctor"})
 
 
 @mcp.tool()
@@ -250,5 +285,23 @@ def pod_diagnose(namespace: str, pod_name: str) -> Dict[str, Any]:
         return {"error": _safe_message(error), "namespace": namespace, "pod_name": pod_name}
 
 
+def _run_server() -> None:
+    if HTTP_MODE:
+        logger.info(
+            "Starting eks-pod-doctor MCP server on http://%s:%s/mcp (transport=streamable-http)",
+            MCP_HOST,
+            MCP_PORT,
+        )
+        mcp.run(transport="streamable-http")
+        return
+
+    logger.info("Starting eks-pod-doctor MCP server with stdio transport")
+    mcp.run(transport="stdio")
+
+
 if __name__ == "__main__":
-    mcp.run()
+    try:
+        _run_server()
+    except Exception:
+        logger.exception("eks-pod-doctor server failed to start")
+        raise

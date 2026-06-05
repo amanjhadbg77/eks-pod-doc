@@ -10,4 +10,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
 
+ENV MCP_TRANSPORT=http \
+    MCP_HOST=0.0.0.0 \
+    MCP_PORT=8080
+
+EXPOSE 8080
+
 CMD ["python", "src/server.py"]

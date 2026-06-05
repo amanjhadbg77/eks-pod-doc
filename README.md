@@ -45,8 +45,17 @@ python src/server.py
 
 ## Docker build
 
+The container runs the MCP server over HTTP (not stdio) so the process stays alive and logs are visible.
+
 ```bash
 docker build -t eks-pod-doctor:latest .
+docker run --rm -p 8080:8080 eks-pod-doctor:latest
+```
+
+Health check:
+
+```bash
+curl http://localhost:8080/health
 ```
 
 ## Push image to ECR
@@ -79,8 +88,12 @@ kubectl apply -f k8s/serviceaccount-irsa.yaml
 
 ```bash
 kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
 kubectl -n mcp-system rollout status deploy/eks-pod-doctor
+kubectl -n mcp-system logs deploy/eks-pod-doctor
 ```
+
+The pod listens on port `8080` and exposes `/health` for readiness/liveness probes.
 
 ## Security notes
 
@@ -91,3 +104,5 @@ kubectl -n mcp-system rollout status deploy/eks-pod-doctor
 ## MCP client integration
 
 Point your MCP-capable client to this server process/container and invoke `pod_diagnose` first for failed pods, then drill into `pod_events` and `pod_logs` for confirmation.
+
+# run npx @modelcontextprotocol/inspector - access the MCP inspecter and then connect to mcp server like streamable HTTP localhost:8080(localhost;<>)
