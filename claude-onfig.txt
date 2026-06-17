@@ -1,7 +1,0 @@
-{
-  "mcpServers": {
-    "k8s": {
-      "command": "mcp-remote",
-      "args": ["http://localhost:8080/mcp" ]
-    }
-  },
